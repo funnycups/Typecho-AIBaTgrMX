@@ -15,19 +15,19 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         if (!method_exists('Typecho_Plugin', 'factory')) {
             throw new Typecho_Plugin_Exception(_t('无法加载插件，请确认 Typecho 版本'));
         }
-        
+
         try {
             $db = Typecho_Db::get();
             $prefix = $db->getPrefix();
-            
+
             self::createTables($db, $prefix);
-            
+
             Typecho_Plugin::factory('Widget_Abstract_Contents')->excerptEx = array('AIBaTgrMX_Plugin', 'customExcerpt');
             Typecho_Plugin::factory('Widget_Contents_Post_Edit')->write = array('AIBaTgrMX_Plugin', 'beforePublish');
             Typecho_Plugin::factory('Widget_Archive')->header = array('AIBaTgrMX_Plugin', 'optimizeSEO');
-            
+
             return _t('插件启用成功');
-            
+
         } catch (Exception $e) {
             throw new Typecho_Plugin_Exception(_t('插件启用失败，错误信息：%s', $e->getMessage()));
         }
@@ -60,7 +60,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('选择要使用的 API 服务提供商')
         );
         $form->addInput($provider);
-        
+
         $customApiUrl = new Typecho_Widget_Helper_Form_Element_Text(
             'customApiUrl',
             NULL,
@@ -69,7 +69,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('当选择"自定义 API"时，请输入完整的API接口地址')
         );
         $form->addInput($customApiUrl);
-        
+
         $keyValue = new Typecho_Widget_Helper_Form_Element_Text(
             'keyValue',
             NULL,
@@ -103,7 +103,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('选择要使用的 AI 模型')
         );
         $form->addInput($modelName);
-        
+
         $customModel = new Typecho_Widget_Helper_Form_Element_Text(
             'customModel',
             NULL,
@@ -160,7 +160,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('选择要启用的 AI 功能')
         );
         $form->addInput($features);
-        
+
         $maxLength = new Typecho_Widget_Helper_Form_Element_Text(
             'maxLength',
             NULL,
@@ -169,7 +169,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('自动生成摘要的最大字数')
         );
         $form->addInput($maxLength);
-        
+
         $maxTags = new Typecho_Widget_Helper_Form_Element_Text(
             'maxTags',
             NULL,
@@ -178,9 +178,9 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('自动生成的标签数量上限（1-10）')
         );
         $form->addInput($maxTags->addRule('required', _t('请填写标签数量'))
-                               ->addRule('isInteger', _t('标签数量必须是整数'))
-                               ->addRule('min', _t('标签数量必须大于等于1'), 1)
-                               ->addRule('max', _t('标签数量必须小于等于10'), 10));
+            ->addRule('isInteger', _t('标签数量必须是整数'))
+            ->addRule('min', _t('标签数量必须大于等于1'), 1)
+            ->addRule('max', _t('标签数量必须小于等于10'), 10));
 
         $language = new Typecho_Widget_Helper_Form_Element_Select(
             'language',
@@ -199,7 +199,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             _t('选择 AI 生成内容的语言')
         );
         $form->addInput($language);
-        
+
         $cacheTime = new Typecho_Widget_Helper_Form_Element_Text(
             'cacheTime',
             NULL,
@@ -389,23 +389,23 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         try {
             $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
             $features = $options->features ? $options->features : array();
-            
+
             if (!in_array('summary', $features)) {
                 return $excerpt;
             }
-            
+
             $db = Typecho_Db::get();
             $customContent = $db->fetchRow($db->select('str_value')
                 ->from('table.fields')
                 ->where('cid = ?', $widget->cid)
                 ->where('name = ?', 'content'));
-            
+
             if ($customContent && !empty($customContent['str_value'])) {
                 $excerpt = $customContent['str_value'];
             } else {
                 $prompt = "请为以下文章生成一个简短的摘要，字数不超过{$options->maxLength}字：\n\n{$widget->text}";
                 $summary = self::callApi($prompt, 'summary');
-                
+
                 if (!empty($summary)) {
                     if ($customContent) {
                         $db->query($db->update('table.fields')
@@ -448,11 +448,11 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             $text = $contents['text'];
             $segments = array();
             $maxLength = 3000;
-            
+
             if (mb_strlen($text) > $maxLength) {
                 $paragraphs = preg_split('/\n\s*\n/', $text);
                 $currentSegment = '';
-                
+
                 foreach ($paragraphs as $paragraph) {
                     if (mb_strlen($currentSegment . "\n\n" . $paragraph) <= $maxLength) {
                         $currentSegment .= ($currentSegment ? "\n\n" : '') . $paragraph;
@@ -477,12 +477,12 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                         $prompt = "请为以下文章片段生成摘要，字数不超过{$options->maxLength}字：\n\n{$segment}";
                         $summaries[] = self::callApi($prompt, 'summary');
                     }
-                    
+
                     $summary = implode(' ', $summaries);
                     if (mb_strlen($summary) > $options->maxLength) {
                         $summary = mb_substr($summary, 0, $options->maxLength) . '...';
                     }
-                    
+
                     self::saveField($obj->cid, 'content', $summary);
                     return $summary;
                 };
@@ -497,7 +497,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                             $allTags = array_merge($allTags, explode(',', $tags));
                         }
                     }
-                    
+
                     $allTags = array_unique($allTags);
                     $allTags = array_slice($allTags, 0, $options->maxTags);
                     return implode(',', $allTags);
@@ -515,7 +515,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             }
 
             $results = self::executeTasksConcurrently($tasks);
-            
+
             foreach ($results as $index => $result) {
                 if ($index === 0 && in_array('summary', $features)) {
                 } elseif ($index === 1 && in_array('tags', $features) && !empty($result)) {
@@ -536,7 +536,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     {
         $results = array();
         $processes = array();
-        
+
         foreach ($tasks as $index => $task) {
             try {
                 $results[$index] = $task();
@@ -545,7 +545,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                 $results[$index] = null;
             }
         }
-        
+
         return $results;
     }
 
@@ -555,7 +555,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         $row = $db->fetchRow($db->select()->from('table.fields')
             ->where('cid = ?', $cid)
             ->where('name = ?', $name));
-            
+
         if ($row) {
             $db->query($db->update('table.fields')
                 ->rows(array('str_value' => $value))
@@ -583,19 +583,19 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
 
         try {
             $seoInfo = self::getOrGenerateSEOInfo($archive);
-            
+
             // 确保 $seoInfo 是数组并且包含必要的键
             if (is_array($seoInfo) && isset($seoInfo['description']) && isset($seoInfo['keywords'])) {
                 $description = htmlspecialchars($seoInfo['description'], ENT_QUOTES, 'UTF-8');
                 $keywords = htmlspecialchars($seoInfo['keywords'], ENT_QUOTES, 'UTF-8');
-                
+
                 echo '<meta name="description" content="' . $description . '" />' . "\n";
                 echo '<meta name="keywords" content="' . $keywords . '" />' . "\n";
             } else {
                 // 使用默认值
                 $description = mb_substr($archive->excerpt ?? '', 0, 200);
                 $keywords = is_array($archive->tags) ? implode(',', $archive->tags) : ($archive->tags ?? '');
-                
+
                 echo '<meta name="description" content="' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '" />' . "\n";
                 echo '<meta name="keywords" content="' . htmlspecialchars($keywords, ENT_QUOTES, 'UTF-8') . '" />' . "\n";
             }
@@ -604,7 +604,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             // 发生错误时使用默认值
             $description = mb_substr($archive->excerpt ?? '', 0, 200);
             $keywords = is_array($archive->tags) ? implode(',', $archive->tags) : ($archive->tags ?? '');
-            
+
             echo '<meta name="description" content="' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '" />' . "\n";
             echo '<meta name="keywords" content="' . htmlspecialchars($keywords, ENT_QUOTES, 'UTF-8') . '" />' . "\n";
         }
@@ -613,7 +613,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     public static function formatContent($content, $obj)
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
-        
+
         try {
             if (in_array('format', $options->features)) {
                 $content = self::optimizeFormat($content);
@@ -634,11 +634,11 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     private static function callApi($prompt, $type, $retries = 3)
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
-        
+
         $provider = $options->provider;
         $modelName = $options->modelName === 'custom' ? $options->customModel : $options->modelName;
         $keyValue = $options->keyValue;
-        
+
         if (empty($keyValue)) {
             throw new Exception('API Key not configured');
         }
@@ -659,7 +659,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             ),
             'temperature' => 0.7,
             'max_tokens' => intval($options->maxLength) * 2,
-            'request_timeout' => 30
+//            'request_timeout' => 30
         );
 
         $lastError = null;
@@ -682,7 +682,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
 
                 $response = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                
+
                 if (curl_errno($ch)) {
                     throw new Exception('API调用失败: ' . curl_error($ch));
                 }
@@ -698,7 +698,10 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                 }
 
                 if (isset($result['choices'][0]['message']['content'])) {
-                    return trim($result['choices'][0]['message']['content']);
+                    $pattern = '/```json\s*(.*)\s*```/s';
+                    return preg_replace_callback($pattern, function ($matches) {
+                        return $matches[1];
+                    },trim($result['choices'][0]['message']['content']));
                 }
 
                 throw new Exception('API响应格式错误');
@@ -739,20 +742,20 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
         $config = self::getDefaultConfig();
-        
+
         if ($provider === 'custom') {
             if (empty($options->apiUrl)) {
                 throw new Exception('Custom API URL is required');
             }
             return $options->apiUrl;
         }
-        
+
         $baseUrl = rtrim($options->apiUrl ?: $config[$provider]['url'], '/');
-        $endpoint = !empty($options->customEndpoint) 
-            ? $options->customEndpoint 
+        $endpoint = !empty($options->customEndpoint)
+            ? $options->customEndpoint
             : $config[$provider]['endpoint'];
         $endpoint = '/' . ltrim($endpoint, '/');
-        
+
         return $baseUrl . $endpoint;
     }
 
@@ -767,7 +770,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             "stream" => false,
             "temperature" => floatval($options->temperature ?? 0.7)
         );
-        
+
         $headers = array(
             'Authorization: Bearer ' . $key,
             'Content-Type: application/json'
@@ -786,7 +789,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             ),
             "temperature" => floatval($options->temperature ?? 0.7)
         );
-        
+
         $headers = array(
             'Authorization: Bearer ' . $key,
             'Content-Type: application/json'
@@ -814,11 +817,11 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
 
                 $response = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                
+
                 if (curl_errno($ch)) {
                     throw new Exception(curl_error($ch));
                 }
-                
+
                 curl_close($ch);
 
                 if ($httpCode !== 200) {
@@ -850,31 +853,42 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
         $cacheTime = intval($options->cacheTime);
-        
-        if ($cacheTime <= 0) {
+
+        if ($cacheTime < 0) {
             return $callback();
         }
 
         try {
             $db = Typecho_Db::get();
             $prefix = $db->getPrefix();
-            
+
+            if ($cacheTime == 0) {
+                $cache = $db->fetchRow($db->select()
+                    ->from('table.ai_content')
+                    ->where('cid = ?', $cid)
+                    ->where('type = ?', $type));
+
+                if ($cache) {
+                    return $cache['content'];
+                }
+            }
+
             $cache = $db->fetchRow($db->select()
                 ->from('table.ai_content')
                 ->where('cid = ?', $cid)
                 ->where('type = ?', $type)
                 ->where('created > ?', time() - $cacheTime));
-            
+
             if ($cache) {
                 return $cache['content'];
             }
 
             $content = $callback();
-            
+
             $db->query($db->delete('table.ai_content')
                 ->where('cid = ?', $cid)
                 ->where('type = ?', $type));
-                
+
             $db->query($db->insert('table.ai_content')->rows(array(
                 'cid' => $cid,
                 'type' => $type,
@@ -893,23 +907,23 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
         $errorMsg = sprintf('[%s] %s: %s', date('Y-m-d H:i:s'), $context, $error->getMessage());
-        
+
         if (in_array('log', $options->errorNotify)) {
             $logFile = __TYPECHO_ROOT_DIR__ . '/usr/logs/ai_assistant.log';
             error_log($errorMsg . "\n", 3, $logFile);
-            
+
             if (file_exists($logFile) && filesize($logFile) > 5 * 1024 * 1024) {
                 rename($logFile, $logFile . '.' . date('Ymd'));
             }
         }
-        
+
         if (in_array('email', $options->errorNotify) && !empty($options->adminMail)) {
             $mailer = new Typecho_Mail();
             $mailer->setFrom($options->adminMail)
-                   ->setTo($options->adminMail)
-                   ->setSubject('AI助手错误通知')
-                   ->setBody($errorMsg)
-                   ->send();
+                ->setTo($options->adminMail)
+                ->setSubject('AI助手错误通知')
+                ->setBody($errorMsg)
+                ->send();
         }
     }
 
@@ -924,7 +938,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
 
         $prompt = '';
         $targetLang = self::getTargetLanguage($options->currentContent ?? '');
-        
+
         $langMap = [
             'zh' => '中文',
             'en' => 'English',
@@ -941,29 +955,29 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         switch ($type) {
             case 'summary':
                 $prompt = $options->summaryPrompt ?: $defaultPrompts['summary'];
-                $prompt = str_replace(['{{LANGUAGE}}', '{{MAX_LENGTH}}'], 
-                    [$language, $options->maxLength], 
+                $prompt = str_replace(['{{LANGUAGE}}', '{{MAX_LENGTH}}'],
+                    [$language, $options->maxLength],
                     $prompt);
                 break;
-            
+
             case 'tags':
                 $prompt = $options->tagsPrompt ?: $defaultPrompts['tags'];
-                $prompt = str_replace(['{{LANGUAGE}}', '{{MAX_TAGS}}'], 
-                    [$language, $options->maxTags], 
+                $prompt = str_replace(['{{LANGUAGE}}', '{{MAX_TAGS}}'],
+                    [$language, $options->maxTags],
                     $prompt);
                 break;
-            
+
             case 'category':
                 $prompt = $options->categoryPrompt ?: $defaultPrompts['category'];
-                $prompt = str_replace(['{{LANGUAGE}}', '{{CATEGORIES}}'], 
-                    [$language, implode("\n", $options->categories ?? [])], 
+                $prompt = str_replace(['{{LANGUAGE}}', '{{CATEGORIES}}'],
+                    [$language, implode("\n", $options->categories ?? [])],
                     $prompt);
                 break;
-            
+
             case 'seo':
                 $prompt = $options->seoPrompt ?: $defaultPrompts['seo'];
-                $prompt = str_replace(['{{LANGUAGE}}', '{{SEO_LENGTH}}'], 
-                    [$language, $options->seoLength ?? 200], 
+                $prompt = str_replace(['{{LANGUAGE}}', '{{SEO_LENGTH}}'],
+                    [$language, $options->seoLength ?? 200],
                     $prompt);
                 break;
         }
@@ -977,14 +991,14 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             try {
                 $response = self::callApi($archive->text, 'seo');
                 $seoData = json_decode($response, true);
-                
+
                 // 验证返回的数据格式是否正确
                 if (!is_array($seoData) || !isset($seoData['description']) || !isset($seoData['keywords'])) {
                     throw new Exception('SEO数据格式无效');
                 }
-                
+
                 return $seoData;
-                
+
             } catch (Exception $e) {
                 self::handleError('SEO生成', $e);
                 // 返回一个格式正确的备用数组
@@ -1001,15 +1015,15 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         try {
             $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
             $response = self::callApi($content, 'tags');
-            
+
             $tags = array_map('trim', explode(',', $response));
             $tags = array_filter($tags, function($tag) {
                 return !empty($tag) && mb_strlen($tag) <= 20;
             });
-            
+
             $tags = array_unique($tags);
             $tags = array_slice($tags, 0, intval($options->maxTags));
-            
+
             return implode(',', $tags);
         } catch (Exception $e) {
             error_log('标签生成错误: ' . $e->getMessage());
@@ -1025,7 +1039,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                 ->from('table.metas')
                 ->where('type = ?', 'category')
                 ->order('order', Typecho_Db::SORT_ASC));
-            
+
             if (empty($categories)) {
                 return '';
             }
@@ -1039,10 +1053,10 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
 
             $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
             $options->categories = $categoryInfo;
-            
+
             // 获取AI建议的分类
             $suggestedCategory = trim(self::callApi($content, 'category'));
-            
+
             // 精确匹配
             foreach ($categories as $cat) {
                 if (strcasecmp($cat['name'], $suggestedCategory) === 0) {
@@ -1050,10 +1064,10 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
                     return $cat['mid'];
                 }
             }
-            
+
             // 如果没有精确匹配，尝试模糊匹配
             foreach ($categories as $cat) {
-                if (mb_stripos($cat['name'], $suggestedCategory) !== false || 
+                if (mb_stripos($cat['name'], $suggestedCategory) !== false ||
                     mb_stripos($suggestedCategory, $cat['name']) !== false) {
                     error_log('找到模糊匹配的分类: ' . $cat['name'] . ' (mid: ' . $cat['mid'] . ')');
                     return $cat['mid'];
@@ -1102,30 +1116,30 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     private static function getTargetLanguage($content)
     {
         $options = Typecho_Widget::widget('Widget_Options')->plugin('AIBaTgrMX');
-        
+
         if ($options->language === 'auto') {
             return self::detectLanguage($content);
         }
-        
+
         return $options->language;
     }
 
     private static function detectLanguage($content)
     {
         $sample = mb_substr($content, 0, 100);
-        
+
         $zhCount = preg_match_all('/[\x{4e00}-\x{9fa5}]/u', $sample, $matches);
         $jaCount = preg_match_all('/[\x{3040}-\x{309F}\x{30A0}-\x{30FF}]/u', $sample, $matches);
         $koCount = preg_match_all('/[\x{3130}-\x{318F}\x{AC00}-\x{D7AF}]/u', $sample, $matches);
         $ruCount = preg_match_all('/[\x{0400}-\x{04FF}]/u', $sample, $matches);
-        
+
         $total = mb_strlen($sample);
-        
+
         if ($zhCount / $total > 0.3) return 'zh';
         if ($jaCount / $total > 0.3) return 'ja';
         if ($koCount / $total > 0.3) return 'ko';
         if ($ruCount / $total > 0.3) return 'ru';
-        
+
         return 'en';
     }
 
@@ -1236,7 +1250,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         $contents = $db->fetchAll($db->select('text, content')
             ->from('table.contents')
             ->where('type = ? OR type = ?', 'post', 'page'));
-        
+
         $files = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($uploadDir, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
@@ -1271,12 +1285,12 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         try {
             $db = Typecho_Db::get();
             $cacheKey = md5($content . $type);
-            
+
             $cached = $db->fetchRow($db->select()
                 ->from('table.ai_content')
                 ->where('type = ?', $type)
                 ->where('cid = ?', $cacheKey));
-            
+
             if (!$cached) {
                 self::asyncApiCall($content, $type);
             }
@@ -1289,7 +1303,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     {
         $options = Typecho_Widget::widget('Widget_Options');
         $url = Typecho_Common::url('async-ai', $options->index);
-        
+
         $ch = curl_init();
         curl_setopt_array($ch, array(
             CURLOPT_URL => $url,
@@ -1308,15 +1322,15 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
     private static function securityCheck($content)
     {
         $content = self::xssClean($content);
-        
+
         if (self::containsSensitiveContent($content)) {
             throw new Exception('Content contains sensitive information');
         }
-        
+
         if (!self::checkRateLimit()) {
             throw new Exception('API rate limit exceeded');
         }
-        
+
         return $content;
     }
 
@@ -1341,7 +1355,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
         if (!is_dir($backupDir)) {
             mkdir($backupDir, 0755, true);
         }
-        
+
         $backupFile = $backupDir . date('Ymd_His') . '.json';
         file_put_contents($backupFile, json_encode(array(
             'content' => $content,
