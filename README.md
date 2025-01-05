@@ -34,7 +34,7 @@ AIBaTgrMX 是一款专业的 Typecho AI 内容助手插件，基于先进的 AI 
    ```
 
 2. **上传文件**
-   - 将插件目录上传至 `usr/plugins/AIBaTgrMX`
+   - 将插件目录AIBaTgrMX上传至 `usr/plugins/`
    - 确保目录权限设置正确（建议 755）
 
 3. **插件启用**
