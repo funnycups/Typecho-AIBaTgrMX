@@ -4,8 +4,8 @@
  * AIBaTgrMX 是一个多功能AI助手插件，包含文章摘要、标签生成、分类推荐、SEO优化
  *
  * @package AIBaTgrMX
- * @author Looks
- * @version 2.0
+ * @author Looks, FunnyCups
+ * @version 2.1
  * @link https://blog.tgrmx.cn
  */
 class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
@@ -25,6 +25,7 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             Typecho_Plugin::factory('Widget_Abstract_Contents')->excerptEx = array('AIBaTgrMX_Plugin', 'customExcerpt');
             Typecho_Plugin::factory('Widget_Contents_Post_Edit')->write = array('AIBaTgrMX_Plugin', 'beforePublish');
             Typecho_Plugin::factory('Widget_Archive')->header = array('AIBaTgrMX_Plugin', 'optimizeSEO');
+            Typecho_Plugin::factory('Widget_Abstract_Contents')->contentEx = array('AIBaTgrMX_Plugin', 'customContent');
 
             return _t('插件启用成功');
 
@@ -1361,5 +1362,16 @@ class AIBaTgrMX_Plugin implements Typecho_Plugin_Interface
             'content' => $content,
             'timestamp' => time()
         )));
+    }
+
+    public static function customContent($content, $widget)
+    {
+        $summary = $widget->fields->content;
+        $template = "<strong>摘要：</strong>{{text}}<br/>";
+        if (empty($summary)) return $content;
+        $pureSummary = str_replace("{{text}}", $summary, $template);
+        $summaryString = '<blockquote id="summary">' . $pureSummary . "</blockquote>";
+        $content = $summaryString . $content;
+        return $content;
     }
 }
